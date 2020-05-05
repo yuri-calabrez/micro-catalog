@@ -1,5 +1,6 @@
-import {MicroCatalogApplication} from './application';
+import "./bootstrap";
 import {ApplicationConfig} from '@loopback/core';
+import {MicroCatalogApplication} from './application';
 
 export {MicroCatalogApplication};
 
