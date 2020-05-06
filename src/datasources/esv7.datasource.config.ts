@@ -4,6 +4,7 @@ export default {
   "connector": "esv6",
   "index": "catalog",
   "version": 7,
+  "debug": process.env.APP_ENV === "dev",
   //"defaultSize": "",
   "configuration": {
     "node": process.env.ELASTIC_SEARCH_HOST,
