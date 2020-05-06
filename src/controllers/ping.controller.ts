@@ -57,8 +57,9 @@ export class PingController {
 
   @get('/categories')
   async index() {
+    const id = (Math.random() * 10).toString()
     await this.categoryRepository.create({
-      id: "1",
+      id: id,
       name: "Categoria teste",
       description: "Descrição teste"
     })
