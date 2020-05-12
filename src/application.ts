@@ -1,26 +1,30 @@
 import {BootMixin} from '@loopback/boot';
-import {ApplicationConfig} from '@loopback/core';
-import {
-  RestExplorerBindings,
-  RestExplorerComponent,
-} from '@loopback/rest-explorer';
+import {ApplicationConfig, Application} from '@loopback/core';
+import {RestExplorerBindings} from '@loopback/rest-explorer';
 import {RepositoryMixin} from '@loopback/repository';
-import {RestApplication} from '@loopback/rest';
 import {ServiceMixin} from '@loopback/service-proxy';
 import path from 'path';
 import {MySequence} from './sequence';
+import {RabbitMqServer} from './servers';
+import {RestComponent, RestServer} from '@loopback/rest';
+import {RestExplorerComponent} from './components';
 
 export class MicroCatalogApplication extends BootMixin(
-  ServiceMixin(RepositoryMixin(RestApplication)),
+  ServiceMixin(RepositoryMixin(Application)),
 ) {
   constructor(options: ApplicationConfig = {}) {
     super(options);
 
+    options.rest.sequence = MySequence;
+    this.component(RestComponent)
+    const reserServer = this.getSync<RestServer>('servers.RestServer')
+    reserServer.static('/', path.join(__dirname, '../public'));
+
     // Set up the custom sequence
-    this.sequence(MySequence);
+
 
     // Set up default home page
-    this.static('/', path.join(__dirname, '../public'));
+    //this.static('/', path.join(__dirname, '../public'));
 
     // Customize @loopback/rest-explorer configuration here
     this.configure(RestExplorerBindings.COMPONENT).to({
@@ -38,5 +42,7 @@ export class MicroCatalogApplication extends BootMixin(
         nested: true,
       },
     };
+
+    this.server(RabbitMqServer)
   }
 }
