@@ -1,11 +1,19 @@
 import {Server} from '@loopback/core';
 import {Context} from "@loopback/context"
 import {connect, Connection, Channel, Replies} from "amqplib"
+import {repository} from '@loopback/repository';
+import {CategoryRepository} from '../repositories';
+import {Category} from '../models';
 
 export class RabbitMqServer extends Context implements Server {
 
   private _listening: boolean;
   conn: Connection
+  channel: Channel
+
+  constructor(@repository(CategoryRepository) private categoryRepository: CategoryRepository) {
+    super()
+  }
 
   async start(): Promise<void> {
     this.conn = await connect({
@@ -18,23 +26,45 @@ export class RabbitMqServer extends Context implements Server {
   }
 
   async boot() {
-    const channel: Channel = await this.conn.createChannel()
-    const queue: Replies.AssertQueue = await channel.assertQueue('micro-catalog/sync-videos')
-    const exchange: Replies.AssertExchange = await channel.assertExchange('amq.topic', 'topic')
+    this.channel = await this.conn.createChannel()
+    const queue: Replies.AssertQueue = await this.channel.assertQueue('micro-catalog/sync-videos')
+    const exchange: Replies.AssertExchange = await this.channel.assertExchange('amq.topic', 'topic')
 
-    await channel.bindQueue(queue.queue, exchange.exchange, 'model.*.*')
-    //const result = channel.sendToQueue('my-first-queue', Buffer.from('hello world'))
-    //await channel.publish('amq.direct', 'minha-routing-key', Buffer.from('publicado por routing key'))
+    await this.channel.bindQueue(queue.queue, exchange.exchange, 'model.*.*')
+    //const result = this.channel.sendToQueue('my-first-queue', Buffer.from('hello world'))
+    //this.channel.publish('amq.direct', 'minha-routing-key', Buffer.from('publicado por routing key'))
 
-    channel.consume(queue.queue, (message) => {
+    this.channel.consume(queue.queue, (message) => {
       if (!message) {
         return
       }
-      console.log(JSON.parse(message.content.toString()))
+      const data = JSON.parse(message.content.toString())
       const [model, event] = message.fields.routingKey.split('.').splice(1)
-      console.log(model, event)
+      this
+        .sync({model, event, data})
+        .then(() => this.channel.ack(message))
+        .catch(() => this.channel.reject(message, false))
     })
     //console.log(result)
+  }
+
+  async sync({model, event, data}: {model: string, event: string, data: Category}) {
+    if (model === 'category') {
+      switch (event) {
+        case 'created':
+          await this.categoryRepository.create({
+            ...data,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          break
+        case 'updated':
+          await this.categoryRepository.updateById(data.id, data)
+          break
+        case 'deleted':
+          await this.categoryRepository.deleteById(data.id)
+      }
+    }
   }
 
   async stop(): Promise<void> {

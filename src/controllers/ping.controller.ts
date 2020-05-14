@@ -61,8 +61,8 @@ export class PingController {
     await this.categoryRepository.create({
       id: id,
       name: "Categoria teste",
-      created_at: new Date(),
-      updated_at: new Date()
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     })
     return this.categoryRepository.find()
   }

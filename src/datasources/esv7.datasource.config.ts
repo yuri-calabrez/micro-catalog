@@ -33,6 +33,9 @@ export default {
         }
       }
     },
+    "description": {
+      "type": "text"
+    },
     "is_active": {
       "type": "boolean"
     },
