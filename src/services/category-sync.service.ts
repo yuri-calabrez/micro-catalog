@@ -14,7 +14,7 @@ export class CategorySyncService {
     queue: 'x1',
     routingKey: 'model.category.*'
   })
-  handler() {
-    console.log(this.categoryRepository.entityClass)
+  handler({data}: {data: any}) {
+    console.log(data)
   }
 }

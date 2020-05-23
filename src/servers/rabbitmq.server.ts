@@ -1,9 +1,8 @@
 import {Server, CoreBindings, Application} from '@loopback/core';
 import {Context, inject, MetadataInspector, Binding} from "@loopback/context"
-import {Channel, Replies, Options, ConfirmChannel} from "amqplib"
+import {Channel, Options, ConfirmChannel} from "amqplib"
 import {repository} from '@loopback/repository';
 import {CategoryRepository} from '../repositories';
-import {Category} from '../models';
 import {RabbitmqBindings} from '../keys';
 import {AmqpConnectionManagerOptions, AmqpConnectionManager, connect, ChannelWrapper} from 'amqp-connection-manager';
 import {RABBITMQ_SUBSCRIBE_DECORATOR, RabbitmqSubscribeMetadata} from '../decorators';
@@ -23,7 +22,6 @@ export class RabbitMqServer extends Context implements Server {
 
   constructor(
     @inject(CoreBindings.APPLICATION_INSTANCE) public app: Application,
-    @repository(CategoryRepository) private categoryRepository: CategoryRepository,
     @inject(RabbitmqBindings.CONFIG) private config: RabbitmqConfig
   ) {
     super(app)
@@ -45,8 +43,6 @@ export class RabbitMqServer extends Context implements Server {
 
     await this.setupExchanges()
     await this.bindingSubscribers()
-
-    //this.boot()
   }
 
   private async setupExchanges() {
@@ -73,6 +69,8 @@ export class RabbitMqServer extends Context implements Server {
           const routingKeys = Array.isArray(routingKey) ? routingKey : [routingKey]
 
           await Promise.all(routingKeys.map(rk => channel.bindQueue(assertQueue.queue, exchange, rk)))
+
+          await this.consume({channel, queue: assertQueue.queue, method: item.method})
         })
       })
   }
@@ -109,47 +107,30 @@ export class RabbitMqServer extends Context implements Server {
       }, [])
   }
 
-  async boot() {
-    // @ts-ignore
-    this.channel = await this.conn.createChannel()
-    const queue: Replies.AssertQueue = await this.channel.assertQueue('micro-catalog/sync-videos')
-    const exchange: Replies.AssertExchange = await this.channel.assertExchange('amq.topic', 'topic')
+  private async consume({channel, queue, method}: {channel: ConfirmChannel, queue: string, method: Function}) {
+    await channel.consume(queue, async message => {
+      try {
+        if (!message) {
+          throw new Error("Received no message")
+        }
 
-    await this.channel.bindQueue(queue.queue, exchange.exchange, 'model.*.*')
-    //const result = this.channel.sendToQueue('my-first-queue', Buffer.from('hello world'))
-    //this.channel.publish('amq.direct', 'minha-routing-key', Buffer.from('publicado por routing key'))
-
-    this.channel.consume(queue.queue, (message) => {
-      if (!message) {
-        return
+        const content = message.content
+        if (content) {
+          let data
+          try {
+            data = JSON.parse(content.toString())
+          } catch (e) {
+            data = null
+          }
+          console.log(data)
+          await method({data, message, channel})
+          channel.ack(message)
+        }
+      } catch (e) {
+        console.error(e)
+        //TODO: politica de resposta
       }
-      const data = JSON.parse(message.content.toString())
-      const [model, event] = message.fields.routingKey.split('.').splice(1)
-      this
-        .sync({model, event, data})
-        .then(() => this.channel.ack(message))
-        .catch(() => this.channel.reject(message, false))
     })
-    //console.log(result)
-  }
-
-  async sync({model, event, data}: {model: string, event: string, data: Category}) {
-    if (model === 'category') {
-      switch (event) {
-        case 'created':
-          await this.categoryRepository.create({
-            ...data,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          break
-        case 'updated':
-          await this.categoryRepository.updateById(data.id, data)
-          break
-        case 'deleted':
-          await this.categoryRepository.deleteById(data.id)
-      }
-    }
   }
 
   async stop(): Promise<void> {
