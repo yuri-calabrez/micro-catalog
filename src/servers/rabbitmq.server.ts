@@ -1,11 +1,12 @@
-import {Server} from '@loopback/core';
-import {Context, inject} from "@loopback/context"
+import {Server, CoreBindings, Application} from '@loopback/core';
+import {Context, inject, MetadataInspector, Binding} from "@loopback/context"
 import {Channel, Replies, Options, ConfirmChannel} from "amqplib"
 import {repository} from '@loopback/repository';
 import {CategoryRepository} from '../repositories';
 import {Category} from '../models';
 import {RabbitmqBindings} from '../keys';
 import {AmqpConnectionManagerOptions, AmqpConnectionManager, connect, ChannelWrapper} from 'amqp-connection-manager';
+import {RABBITMQ_SUBSCRIBE_DECORATOR, RabbitmqSubscribeMetadata} from '../decorators';
 
 export interface RabbitmqConfig {
   uri: string
@@ -21,10 +22,11 @@ export class RabbitMqServer extends Context implements Server {
   channel: Channel
 
   constructor(
+    @inject(CoreBindings.APPLICATION_INSTANCE) public app: Application,
     @repository(CategoryRepository) private categoryRepository: CategoryRepository,
     @inject(RabbitmqBindings.CONFIG) private config: RabbitmqConfig
   ) {
-    super()
+    super(app)
   }
 
   async start(): Promise<void> {
@@ -42,6 +44,8 @@ export class RabbitMqServer extends Context implements Server {
     })
 
     await this.setupExchanges()
+    await this.bindingSubscribers()
+
     //this.boot()
   }
 
@@ -55,6 +59,54 @@ export class RabbitMqServer extends Context implements Server {
         channel.assertExchange(exchange.name, exchange.type, exchange.options)
       )))
     })
+  }
+
+  private async bindingSubscribers() {
+    this
+      .getSubscribers()
+      .map(async (item) => {
+        await this.channelManager.addSetup(async (channel: ConfirmChannel) => {
+          const {exchange, queue, routingKey, queueOptions} = item.metadata
+
+          const assertQueue = await channel.assertQueue(queue ?? '', queueOptions ?? undefined)
+
+          const routingKeys = Array.isArray(routingKey) ? routingKey : [routingKey]
+
+          await Promise.all(routingKeys.map(rk => channel.bindQueue(assertQueue.queue, exchange, rk)))
+        })
+      })
+  }
+
+  private getSubscribers(): {method: Function, metadata: RabbitmqSubscribeMetadata}[] {
+    const bindigs: Array<Readonly<Binding>> = this.find('services.*')
+
+    return bindigs
+      .map(binding => {
+        const metadata = MetadataInspector.getAllMethodMetadata<RabbitmqSubscribeMetadata>(
+          RABBITMQ_SUBSCRIBE_DECORATOR, binding.valueConstructor?.prototype
+        )
+        if (!metadata) {
+          return []
+        }
+
+        const methods = []
+        for (const methodName in metadata) {
+          if (!Object.prototype.hasOwnProperty.call(metadata, methodName)) {
+            return
+          }
+          const service = this.getSync(binding.key) as any
+
+          methods.push({
+            method: service[methodName].bind(service),
+            metadata: metadata[methodName]
+          })
+        }
+        return methods
+      })
+      .reduce((collection: any, item: any) => {
+        collection.push(...item)
+        return collection
+      }, [])
   }
 
   async boot() {
