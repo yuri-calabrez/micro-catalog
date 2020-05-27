@@ -39,6 +39,9 @@ export default {
     "is_active": {
       "type": "boolean"
     },
+    "type": {
+      "type": "byte"
+    },
     "created_at": {
       "type": "date"
     },
