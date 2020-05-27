@@ -3,12 +3,15 @@ import {rabbitmqSubscribe} from '../decorators';
 import {repository} from '@loopback/repository';
 import {CategoryRepository} from '../repositories';
 import {Message} from 'amqplib';
+import {BaseModelSyncService} from './base-model-sync.service';
 
-@bind({scope: BindingScope.TRANSIENT})
-export class CategorySyncService {
+@bind({scope: BindingScope.SINGLETON})
+export class CategorySyncService extends BaseModelSyncService {
   constructor(
-    @repository(CategoryRepository) private categoryRepository: CategoryRepository,
-  ) {}
+    @repository(CategoryRepository) private repository: CategoryRepository,
+  ) {
+    super()
+  }
 
   @rabbitmqSubscribe({
     exchange: 'amq.topic',
@@ -16,20 +19,10 @@ export class CategorySyncService {
     routingKey: 'model.category.*'
   })
   async handler({data, message}: {data: any, message: Message}) {
-    const action = message.fields.routingKey.split('.')[2]
-
-    switch (action) {
-      case 'created':
-        await this.categoryRepository.create(data)
-        break
-
-      case 'updated':
-        await this.categoryRepository.updateById(data.id, data)
-        break
-
-      case 'deleted':
-        await this.categoryRepository.deleteById(data.id)
-        break
-    }
+    await this.sync({
+      repository: this.repository,
+      data,
+      message
+    })
   }
 }
