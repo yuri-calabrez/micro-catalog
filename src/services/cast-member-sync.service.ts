@@ -1,14 +1,18 @@
-import {bind, /* inject, */ BindingScope} from '@loopback/core';
+import {bind, /* inject, */ BindingScope, service} from '@loopback/core';
 import {repository} from '@loopback/repository';
 import {CastMemberRepository} from '../repositories';
 import {rabbitmqSubscribe} from '../decorators';
 import {Message} from 'amqplib';
 import {BaseModelSyncService} from './base-model-sync.service';
+import {ValidatorService} from './validator.service';
 
 @bind({scope: BindingScope.SINGLETON})
 export class CastMemberSyncService extends BaseModelSyncService {
-  constructor(@repository(CastMemberRepository) private repository: CastMemberRepository) {
-    super()
+  constructor(
+    @repository(CastMemberRepository) private repository: CastMemberRepository,
+    @service(ValidatorService) private validate: ValidatorService
+  ) {
+    super(validate)
   }
 
   @rabbitmqSubscribe({

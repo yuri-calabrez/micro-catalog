@@ -7,9 +7,6 @@ export class Category extends Entity {
     id: true,
     generated: false,
     required: true,
-    jsonSchema: {
-      exists: ['Category', 'id']
-    }
   })
   id: string;
 
@@ -26,7 +23,10 @@ export class Category extends Entity {
   @property({
     type: 'string',
     required: false,
-    default: ''
+    jsonSchema: {
+      nullable: true
+    },
+    default: null,
   })
   description: string;
 
