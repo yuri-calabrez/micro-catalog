@@ -59,4 +59,22 @@ export abstract class BaseModelSyncService {
 
     return exists ? repository.updateById(id, entity) : repository.create(entity)
   }
+
+  async syncRelations({
+    id,
+    relationIds,
+    repoRelation
+  }: {
+    id: string,
+    relationIds: string[],
+    repoRelation: DefaultCrudRepository<any, any>,
+    message: Message
+  }) {
+    const collection = await repoRelation.find({
+      where: {
+        or: relationIds.map((idRelation) => ({id: idRelation})),
+      }
+    })
+    console.log(collection)
+  }
 }
