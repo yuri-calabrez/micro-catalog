@@ -37,7 +37,9 @@ export class GenreSyncService extends BaseModelSyncService {
   async handlerCategories({data, message}: {data: any, message: Message}) {
     await this.syncRelations({
       id: data.id,
+      relation: "categories",
       relationIds: data.relation_ids,
+      repository: this.repository,
       repoRelation: this.categoryRepo,
       message
     })

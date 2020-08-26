@@ -1,5 +1,5 @@
 import {Message} from 'amqplib';
-import {DefaultCrudRepository} from '@loopback/repository';
+import {DefaultCrudRepository, EntityNotFoundError} from '@loopback/repository';
 import {pick} from 'lodash'
 import {ValidatorService} from './validator.service';
 
@@ -62,19 +62,39 @@ export abstract class BaseModelSyncService {
 
   async syncRelations({
     id,
+    relation,
     relationIds,
-    repoRelation
+    repository,
+    repoRelation,
+    message
   }: {
     id: string,
+    relation: string,
     relationIds: string[],
+    repository: DefaultCrudRepository<any, any>,
     repoRelation: DefaultCrudRepository<any, any>,
     message: Message
   }) {
+    const fieldsRelation = Object.keys(
+      repository.modelClass.definition.properties[relation].jsonSchema.items.properties
+    ).reduce((obj: any, field: string) => {
+      obj[field] = true
+      return obj
+    }, {})
+
     const collection = await repoRelation.find({
       where: {
         or: relationIds.map((idRelation) => ({id: idRelation})),
-      }
+      },
+      fields: fieldsRelation
     })
-    console.log(collection)
+
+    if (!collection.length) {
+      const error = new EntityNotFoundError(repoRelation.entityClass, relationIds)
+      error.name = 'EntityNotFound'
+      throw error
+    }
+
+    repository.updateById(id, {[relation]: collection})
   }
 }
