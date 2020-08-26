@@ -95,6 +95,6 @@ export abstract class BaseModelSyncService {
       throw error
     }
 
-    repository.updateById(id, {[relation]: collection})
+    await repository.updateById(id, {[relation]: collection})
   }
 }
