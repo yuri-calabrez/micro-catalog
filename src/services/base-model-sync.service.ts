@@ -9,6 +9,14 @@ export interface SyncOptions {
   message: Message
 }
 
+export interface SyncRelationOptions {
+  id: string
+  relation: string
+  relationIds: string[]
+  repository: DefaultCrudRepository<any, any>
+  repoRelation: DefaultCrudRepository<any, any>
+}
+
 
 export abstract class BaseModelSyncService {
 
@@ -65,22 +73,9 @@ export abstract class BaseModelSyncService {
     relation,
     relationIds,
     repository,
-    repoRelation,
-    message
-  }: {
-    id: string,
-    relation: string,
-    relationIds: string[],
-    repository: DefaultCrudRepository<any, any>,
-    repoRelation: DefaultCrudRepository<any, any>,
-    message: Message
-  }) {
-    const fieldsRelation = Object.keys(
-      repository.modelClass.definition.properties[relation].jsonSchema.items.properties
-    ).reduce((obj: any, field: string) => {
-      obj[field] = true
-      return obj
-    }, {})
+    repoRelation
+  }: SyncRelationOptions) {
+    const fieldsRelation = this.extractFieldsRelations(repository, relation)
 
     const collection = await repoRelation.find({
       where: {
@@ -95,6 +90,17 @@ export abstract class BaseModelSyncService {
       throw error
     }
 
-    await repository.updateById(id, {[relation]: collection})
+    //await repository.updateById(id, {[relation]: collection})
+    //TODO: passar para repositorio generico
+    await (repository as any).attachCategories(id, collection)
+  }
+
+  protected extractFieldsRelations(repository: DefaultCrudRepository<any, any>, relation: string) {
+    return Object.keys(
+      repository.modelClass.definition.properties[relation].jsonSchema.items.properties
+    ).reduce((obj: any, field: string) => {
+      obj[field] = true
+      return obj
+    }, {})
   }
 }
