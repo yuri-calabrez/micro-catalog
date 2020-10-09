@@ -47,4 +47,12 @@ export class MicroCatalogApplication extends BootMixin(
 
     this.server(RabbitMqServer)
   }
+
+  async boot() {
+    await super.boot()
+
+    /*const genreRepo = this.getSync('repositories.GenreRepository');
+    //@ts-ignore
+    genreRepo.updateCategories({"id": "1-cat", "name": "Filme", "is_active": true})*/
+  }
 }
