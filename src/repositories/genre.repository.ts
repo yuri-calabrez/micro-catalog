@@ -3,6 +3,7 @@ import {Genre, GenreRelations} from '../models';
 import {Esv7DataSource} from '../datasources';
 import {inject} from '@loopback/core';
 import {Client} from 'es6'
+import {pick} from 'lodash'
 export class GenreRepository extends DefaultCrudRepository<
   Genre,
   typeof Genre.prototype.id,
@@ -47,6 +48,12 @@ export class GenreRepository extends DefaultCrudRepository<
   }
 
   async updateCategories(data: object[]) {
+    const fields = Object.keys(
+      this.modelClass.definition.properties['categories'].jsonSchema.items.properties
+    )
+
+    const category = pick(data, fields)
+
     const document = {
       index: this.dataSource.settings.index,
       refresh: true,
@@ -83,7 +90,7 @@ export class GenreRepository extends DefaultCrudRepository<
             ctx._source['categories'].add(params['category']);
           `,
           params: {
-            category: data
+            category
           }
         }
       }
