@@ -11,10 +11,11 @@ export interface SyncOptions {
 
 export interface SyncRelationOptions {
   id: string
-  relation: string
-  relationIds: string[]
   repository: DefaultCrudRepository<any, any>
-  repoRelation: DefaultCrudRepository<any, any>
+  relationName: string
+  relationIds: string[]
+  relationRepo: DefaultCrudRepository<any, any>,
+  message: Message
 }
 
 
@@ -70,14 +71,15 @@ export abstract class BaseModelSyncService {
 
   async syncRelations({
     id,
-    relation,
-    relationIds,
     repository,
-    repoRelation
+    relationName,
+    relationIds,
+    relationRepo,
+    message
   }: SyncRelationOptions) {
-    const fieldsRelation = this.extractFieldsRelations(repository, relation)
+    const fieldsRelation = this.extractFieldsRelations(repository, relationName)
 
-    const collection = await repoRelation.find({
+    const collection = await relationRepo.find({
       where: {
         or: relationIds.map((idRelation) => ({id: idRelation})),
       },
@@ -85,14 +87,15 @@ export abstract class BaseModelSyncService {
     })
 
     if (!collection.length) {
-      const error = new EntityNotFoundError(repoRelation.entityClass, relationIds)
+      const error = new EntityNotFoundError(relationRepo.entityClass, relationIds)
       error.name = 'EntityNotFound'
       throw error
     }
 
-    //await repository.updateById(id, {[relation]: collection})
-    //TODO: passar para repositorio generico
-    await (repository as any).attachCategories(id, collection)
+    const action = this.getAction(message)
+    if (action === "attached") {
+      await (repository as any).attachRelation(id, relationName, collection)
+    }
   }
 
   protected extractFieldsRelations(repository: DefaultCrudRepository<any, any>, relation: string) {

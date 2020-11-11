@@ -28,7 +28,7 @@ export class UpdateCategoryRelationObserver implements LifeCycleObserver {
         return;
       }
 
-      await this.genreRepository.updateCategories(data)
+      await this.genreRepository.updateRelation('categories', data)
     })
   }
 
