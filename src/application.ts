@@ -7,8 +7,7 @@ import path from 'path';
 import {MySequence} from './sequence';
 import {RabbitMqServer} from './servers';
 import {RestComponent, RestServer} from '@loopback/rest';
-import {RestExplorerComponent, ValidatorsComponent} from './components';
-import {ValidatorService} from './services/validator.service';
+import {EntityComponent, RestExplorerComponent, ValidatorsComponent} from './components';
 import {UpdateCategoryRelationObserver} from './observers/update-category-relation.observer';
 
 export class MicroCatalogApplication extends BootMixin(
@@ -19,6 +18,8 @@ export class MicroCatalogApplication extends BootMixin(
 
     options.rest.sequence = MySequence;
     this.component(RestComponent)
+    this.component(ValidatorsComponent)
+    this.component(EntityComponent)
     const reserServer = this.getSync<RestServer>('servers.RestServer')
     reserServer.static('/', path.join(__dirname, '../public'));
 
